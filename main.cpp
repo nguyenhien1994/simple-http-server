@@ -9,5 +9,7 @@ int main(){
     server.register_handler("/helloworld", helloworld_handler);
     server.run();
 
+    while(true);
+
     return 0;
 }
