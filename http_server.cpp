@@ -1,51 +1,104 @@
 
 #include "http_server.hpp"
 
-void HttpServer::register_handler(const std::string& path, const handler_func_t handler) {
+HttpServer::HttpServer(int port) : port_(port) {
+    workers_.resize(MAX_WORKER_);
+    epoll_events_.resize(MAX_WORKER_);
+
+    // TODO: use first instance for Server to accept new client connection
+}
+
+void HttpServer::register_handler(const std::string& path, const HandlerFunc handler) {
     std::cout << "register_handler: " << path << std::endl;
     handlers_[path] = handler;
 }
 
 void HttpServer::listener() {
     std::cout << "Started listenning...\n";
-    // sockaddr_in client_addr;
-    // socklen_t client_addr_len = sizeof(client_addr);
+    int worker_id = 0;
     while (!stop_) {
         int client_fd = accept(sockfd_, NULL, NULL);
-        // int client_fd = accept4(sockfd_, (sockaddr*)&client_addr, &client_addr_len, SOCK_NONBLOCK);
         if (client_fd == -1) {
-            // std::cerr << "Failed to accept connection\n";
             continue;
         }
 
-        epoll_event ev;
-        ev.events = EPOLLIN;
-        ev.data.fd = client_fd;
-        if (epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, client_fd, &ev) < 0) {
-            std::cerr << "Failed to add epoll fd\n";
-            continue;
+        try {
+            epoll_events_[worker_id].add(client_fd, EPOLLIN);
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << std::endl;
+        }
+        worker_id++;
+        if (worker_id == MAX_WORKER_) {
+            worker_id = 0;
         }
     }
 }
 
-void HttpServer::processor() {
-    std::cout << "Started processing...\n";
-    while (!stop_) {
-        int nbr_events = epoll_wait(epoll_fd_, epoll_events_, MAX_EVENTS, 0);
-        for (int i = 0; i < nbr_events; ++i) {
-            auto req = parse_request(epoll_events_[i].data.fd);
-            Response res;
+void HttpServer::handle_request(EpollWrapper& epoll, int client_fd, Request&& req) {
+    try {
+        Response res;
 
-            auto it = handlers_.find(req.path_);
-            if (it != handlers_.end()) {
-                it->second(req, res);
-            } else {
-                res.status_code_ = 404; // TODO: define enum for status code
-                res.body_ = "NOT FOUND";
+        auto it = handlers_.find(req.path_);
+        if (it != handlers_.end()) {
+            it->second(req, res);
+        } else {
+            res.status_code_ = 404; // TODO: define enum for status code
+            res.body_ = "NOT FOUND";
+        }
+
+        // TODO: send response via epoll EPOLLOUT
+        auto response_buffer = res.to_string();
+        auto response_len = response_buffer.length();
+
+        while (response_len > 0) {
+            auto sent_bytes = send(client_fd, response_buffer.c_str(), response_buffer.length(), 0);
+            if (sent_bytes < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // retry
+                    continue;
+                }
+                epoll.remove(client_fd);
+                close(client_fd);
+                return;
             }
+            response_len -= sent_bytes;
+        }
 
-            send_response(epoll_events_[i].data.fd, res);
-            close(epoll_events_[i].data.fd);
+        if (req.version_ == "HTTP/1.0") {
+            epoll.remove(client_fd);
+            close(client_fd);
+        }
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+    }
+}
+
+void HttpServer::processor(int worker_id) {
+    std::cout << "Started processing...\n";
+    auto epoll = epoll_events_[worker_id];
+    while (!stop_) {
+        auto events = epoll.wait();
+        for (const auto& event : events) {
+            if (event.events & EPOLLIN) {
+                char buffer[4096];
+                ssize_t received_bytes = recv(event.data.fd, buffer, sizeof(buffer), 0);
+                if (received_bytes <= 0) {
+                    // std::cerr << "Client close connection or error\n";
+                    // Client close connection or error
+                    epoll.remove(event.data.fd);
+                    close(event.data.fd);
+                    continue;
+                }
+                buffer[received_bytes] = '\0';
+                handle_request(epoll, event.data.fd, Request(std::string(buffer)));
+            } else if (event.events & EPOLLOUT) {
+                // std::cout << "event EPOLLOUT\n";
+            } else if (event.events & (EPOLLHUP | EPOLLERR)) {
+                epoll.remove(event.data.fd);
+                close(event.data.fd);
+            } else {
+                std::cout << "something unexpected\n";
+            }
         }
     }
 }
@@ -70,34 +123,11 @@ void HttpServer::run() {
         throw std::runtime_error("Failed to bind socket");
     }
 
-    listen(sockfd_, 5);
+    listen(sockfd_, MAX_BACKLOG_);
 
-    if ((epoll_fd_ = epoll_create1(0)) == -1) {
-        throw std::runtime_error("Failed to create epoll");
+    for (int i = 0; i < MAX_WORKER_; ++i) {
+        workers_[i] = std::thread(&HttpServer::processor, this, i);
     }
 
     listener_ = std::thread(&HttpServer::listener, this);
-    worker_ = std::thread(&HttpServer::processor, this);
-}
-
-Request HttpServer::parse_request(int client_fd) {
-    char buffer[1024];
-    ssize_t n = recv(client_fd, buffer, sizeof(buffer), 0);
-    if (n == -1) {
-        std::cerr << "Failed to receive request\n";
-        return Request("");
-    }
-    buffer[n] = '\0';
-    
-    auto reqstr = std::string(buffer);
-    auto req = Request(reqstr);
-    return std::move(req);
-}
-
-void HttpServer::send_response(int client_fd, const Response& res){
-    auto response_buffer = res.to_string();
-    auto n = send(client_fd, response_buffer.c_str(), response_buffer.length(), 0);
-    if (n == -1) {
-        std::cerr << "Failed to send response\n";
-    }
 }

@@ -8,7 +8,7 @@
 #include "utils.hpp"
 
 struct Request {
-    Request(const std::string &raw_string) {
+    Request(std::string&& raw_string) {
         size_t start = 0, end = 0;
 
         // parse the first line
