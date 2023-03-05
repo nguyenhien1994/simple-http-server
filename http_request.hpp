@@ -2,21 +2,26 @@
 
 #include <algorithm>
 #include <sstream>
+#include <iostream>
 #include <string>
 #include <map>
 
 #include "utils.hpp"
 
 struct Request {
-    Request(std::string&& raw_string) {
+    Request(std::string&& raw_string) : raw_request_str_(std::move(raw_string)) {
+        parse_request();
+    }
+
+    void parse_request() {
         size_t start = 0, end = 0;
 
         // parse the first line
-        end = raw_string.find("\r\n", start);
+        end = raw_request_str_.find("\r\n", start);
         if (end == std::string::npos) {
             throw std::invalid_argument("Invalid request string");
         }
-        std::istringstream iss(raw_string.substr(start, end - start));
+        std::istringstream iss(raw_request_str_.substr(start, end - start));
         iss >> method_ >> path_ >> version_;
         if (!iss.good() && !iss.eof()) {
             throw std::invalid_argument("Invalid request string");
@@ -24,10 +29,10 @@ struct Request {
 
         // parse headers
         start = end + 2; // skip \r\n
-        end = raw_string.find("\r\n\r\n", start);
+        end = raw_request_str_.find("\r\n\r\n", start);
         if (end != std::string::npos) {
             iss.clear();
-            iss.str(raw_string.substr(start, end - start));
+            iss.str(raw_request_str_.substr(start, end - start));
 
             std::string line;
             std::string key, value;
@@ -42,9 +47,9 @@ struct Request {
 
         // parse body
         start = end + 4; // skip \r\n\r\n
-        end = raw_string.length();
+        end = raw_request_str_.length();
         if (start < end) {
-            body_ = raw_string.substr(start, end - start);
+            body_ = raw_request_str_.substr(start, end - start);
         }
 
         // print_debug();
@@ -58,6 +63,7 @@ struct Request {
         std::cout << body_ << std::endl;
     }
 
+    std::string raw_request_str_;
     std::string method_;
     std::string path_;
     std::string version_;

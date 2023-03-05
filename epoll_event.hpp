@@ -3,22 +3,21 @@
 #include <vector>
 #include <cstring>
 
-class EpollWrapper {
+class EpollEvent {
 public:
-    EpollWrapper() {
+    EpollEvent() {
         epoll_fd_ = epoll_create1(0);
-        max_events_ = 4096;
         if (epoll_fd_ == -1) {
             throw std::runtime_error("Failed to create epoll");
         }
         events_.resize(max_events_);
     }
 
-    ~EpollWrapper() {
+    ~EpollEvent() {
         close(epoll_fd_);
     }
 
-    void add(int fd, uint32_t events) {
+    void add(int fd, uint32_t events) const {
         struct epoll_event event;
         event.data.fd = fd;
         event.events = events;
@@ -27,7 +26,7 @@ public:
         }
     }
 
-    void modify(int fd, uint32_t events) {
+    void modify(int fd, uint32_t events) const {
         struct epoll_event event;
         event.data.fd = fd;
         event.events = events;
@@ -38,7 +37,7 @@ public:
 
     void remove(int fd) {
         if (epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, nullptr) < 0) {
-            throw std::runtime_error("Failed to remove fd to epoll");
+            throw std::runtime_error("Failed to remove fd to epoll: " + std::to_string(errno));
         }
     }
 
@@ -50,6 +49,6 @@ public:
 
 private:
     int epoll_fd_;
-    int max_events_;
+    static constexpr int max_events_ = SOMAXCONN;
     std::vector<struct epoll_event> events_;
 };

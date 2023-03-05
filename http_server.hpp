@@ -12,32 +12,66 @@
 #include <thread>
 #include <vector>
 
-#include "http_request.hpp"
-#include "http_response.hpp"
-#include "epoll_wrapper.hpp"
+#include "epoll_server.hpp"
 
-using HandlerFunc = std::function<void(const Request&, Response&)>;
-
-class HttpServer {
+template <typename RequestType, typename ResponseType>
+class HttpServer : public EpollServer {
 public:
-    HttpServer(int port);
+    using HandlerFunc = std::function<void(const RequestType&, ResponseType&)>;
 
-    void register_handler(const std::string& path, const HandlerFunc handler);
-    void listener();
-    void processor(int);
-    void run();
-    void handle_request(EpollWrapper& epoll, int client_fd, Request&& req);
+    HttpServer(int port) : EpollServer(port) {
+    }
+
+    void register_handler(const std::string& path, const HandlerFunc handler) {
+        std::cout << "register_handler: " << path << std::endl;
+        handlers_[path] = handler;
+    }
+
+    void handle_epollin(EpollEvent& epoll, int client_fd, std::string&& buffer) {
+        try {
+            RequestType req(std::move(buffer));
+            ResponseType res;
+
+            auto it = handlers_.find(req.path_);
+            if (it != handlers_.end()) {
+                it->second(req, res);
+            } else {
+                res.status_code_ = 404; // TODO: define enum for status code
+                res.body_ = "NOT FOUND";
+            }
+
+            // TODO: send response via epoll EPOLLOUT?
+            auto response_buffer = res.to_string();
+            auto response_len = response_buffer.length();
+
+            while (response_len > 0) {
+                auto sent_bytes = send(client_fd, response_buffer.c_str(), response_buffer.length(), 0);
+                if (sent_bytes < 0) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        // retry
+                        continue;
+                    }
+                    epoll.remove(client_fd);
+                    close(client_fd);
+                    return;
+                }
+                response_len -= sent_bytes;
+            }
+
+            if (req.version_ == "HTTP/1.0") {
+                // std::cout << "req.version_: " << req.version_ << std::endl;
+                epoll.remove(client_fd);
+                close(client_fd);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << std::endl;
+        }
+    }
+
+    void handle_epollout(EpollEvent& epoll, int client_fd, std::string&& buffer) {
+    }
+
 
 private:
-    static constexpr int MAX_WORKER_ = 24;
-    static constexpr int MAX_BACKLOG_ = 10000;
-
-    int sockfd_;
-    int port_;
-
     std::map<std::string, HandlerFunc> handlers_;
-    bool stop_ = false; // TODO: use it to graceful shutdown
-    std::thread listener_;
-    std::vector<std::thread> workers_;
-    std::vector<EpollWrapper> epoll_events_;
 };
