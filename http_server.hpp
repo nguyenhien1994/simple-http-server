@@ -59,7 +59,6 @@ public:
             }
 
             if (req.version_ == "HTTP/1.0") {
-                // std::cout << "req.version_: " << req.version_ << std::endl;
                 epoll.remove(client_fd);
                 close(client_fd);
             }
