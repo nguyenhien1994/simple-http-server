@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 ########################
 # Build executable files
 ########################
-add_executable(HttpServer src/main.cpp src/epoll_server.cpp)
+add_executable(HttpServer src/main.cpp src/epoll_server.cpp src/epoll_event.cpp)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

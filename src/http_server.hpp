@@ -1,16 +1,6 @@
 #pragma once
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/epoll.h>
-
-#include <cstring>
-#include <iostream>
 #include <functional>
-#include <thread>
-#include <vector>
 
 #include "epoll_server.hpp"
 
@@ -27,7 +17,7 @@ public:
         handlers_[path] = handler;
     }
 
-    void handle_epollin(EpollEvent& epoll, int client_fd, std::string&& buffer) {
+    void handle_epollin(EpollEvent& epoll, int client_fd, std::string&& buffer) final {
         try {
             RequestType req(std::move(buffer));
             ResponseType res;
@@ -52,7 +42,7 @@ public:
                         continue;
                     }
                     epoll.remove(client_fd);
-                    close(client_fd);
+                    ::close(client_fd);
                     return;
                 }
                 response_len -= sent_bytes;
@@ -60,14 +50,14 @@ public:
 
             if (req.version_ == "HTTP/1.0") {
                 epoll.remove(client_fd);
-                close(client_fd);
+                ::close(client_fd);
             }
         } catch (const std::exception& e) {
             std::cerr << e.what() << std::endl;
         }
     }
 
-    void handle_epollout(EpollEvent& epoll, int client_fd, std::string&& buffer) {
+    void handle_epollout(EpollEvent& epoll, int client_fd, std::string&& buffer) final {
     }
 
 

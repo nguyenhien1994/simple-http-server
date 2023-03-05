@@ -16,12 +16,12 @@ EpollServer::~EpollServer() {
 }
 
 void EpollServer::init() {
-    if ((server_fd_ = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1) {
+    if ((server_fd_ = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0)) == -1) {
         throw std::runtime_error("Failed to create socket");
     }
 
     int opt = 1;
-    if (setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) == -1) {
+    if (::setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)) == -1) {
         throw std::runtime_error("Failed to set socket options");
     }
 
@@ -30,12 +30,12 @@ void EpollServer::init() {
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(port_);
 
-    if (bind(server_fd_, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
+    if (::bind(server_fd_, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
         std::cerr << "Failed to bind socket, errno: " << std::strerror(errno) << std::endl;
         throw std::runtime_error("Failed to bind socket");
     }
 
-    listen(server_fd_, SOMAXCONN);
+    ::listen(server_fd_, SOMAXCONN);
 
     for (int i = 0; i < max_workers_; ++i) {
         workers_.emplace_back(std::thread(&EpollServer::worker, this, i));
@@ -55,7 +55,7 @@ void EpollServer::worker(int worker_id) {
                 if (received_bytes <= 0) {
                     // Client close connection or error
                     epoll.remove(event.data.fd);
-                    close(event.data.fd);
+                    ::close(event.data.fd);
                     continue;
                 }
                 buffer[received_bytes] = '\0';
@@ -64,7 +64,7 @@ void EpollServer::worker(int worker_id) {
                 // handle_epollout(epoll, event.data.fd, std::move(std::string(buffer)));
             } else if (event.events & (EPOLLHUP | EPOLLERR)) {
                 epoll.remove(event.data.fd);
-                close(event.data.fd);
+                ::close(event.data.fd);
             } else {
                 // std::cerr << "something unexpected\n";
             }
@@ -83,7 +83,7 @@ void EpollServer::serving() {
         auto events = server_epoll_.wait();
         for (const auto& event : events) {
             if (server_fd_ == event.data.fd) {
-                int client_fd = accept(server_fd_, NULL, NULL);
+                int client_fd = ::accept(server_fd_, NULL, NULL);
                 if (client_fd == -1) {
                     continue;
                 }

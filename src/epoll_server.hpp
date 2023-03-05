@@ -2,13 +2,9 @@
 
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <unistd.h>
-#include <string.h>
 #include <sys/epoll.h>
 
-#include <cstring>
 #include <iostream>
-#include <functional>
 #include <thread>
 #include <vector>
 #include <atomic>
