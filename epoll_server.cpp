@@ -1,3 +1,5 @@
+#include <csignal>
+
 #include "epoll_server.hpp"
 
 EpollServer::EpollServer(int port) :
@@ -8,8 +10,8 @@ EpollServer::EpollServer(int port) :
 }
 
 EpollServer::~EpollServer() {
-    for (int i = 0; i < workers_.size(); ++i) {
-        workers_[i].join();
+    if (!stop_) {
+        stop();
     }
 }
 
@@ -42,16 +44,15 @@ void EpollServer::init() {
     server_epoll_.add(server_fd_, EPOLLIN);
 }
 void EpollServer::worker(int worker_id) {
-    std::cout << "Worker started...\n";
+    // std::cout << "Worker thread started...\n";
     auto epoll = epoll_events_[worker_id];
     while (!stop_) {
         auto events = epoll.wait();
         for (const auto& event : events) {
             if (event.events & EPOLLIN) {
-                char buffer[4096];
+                char buffer[4096]; // TODO: handle large request
                 ssize_t received_bytes = recv(event.data.fd, buffer, sizeof(buffer), 0);
                 if (received_bytes <= 0) {
-                    // std::cerr << "Client close connection or error\n";
                     // Client close connection or error
                     epoll.remove(event.data.fd);
                     close(event.data.fd);
@@ -61,9 +62,7 @@ void EpollServer::worker(int worker_id) {
                 handle_epollin(epoll, event.data.fd, std::move(std::string(buffer)));
             } else if (event.events & EPOLLOUT) {
                 // handle_epollout(epoll, event.data.fd, std::move(std::string(buffer)));
-                // std::cout << "event EPOLLOUT\n";
             } else if (event.events & (EPOLLHUP | EPOLLERR)) {
-                // std::cout << "event EPOLLHUP\n";
                 epoll.remove(event.data.fd);
                 close(event.data.fd);
             } else {
@@ -72,8 +71,13 @@ void EpollServer::worker(int worker_id) {
         }
     }
 }
-void EpollServer::run() {
-    std::cout << "Server started...\n";
+
+void EpollServer::start() {
+    std::cout << "Server started listening on port: " << port_ << std::endl;
+    serving_thread_ = std::thread(&EpollServer::serving, this);
+}
+
+void EpollServer::serving() {
     int worker_id = 0;
     while (!stop_) {
         auto events = server_epoll_.wait();
@@ -92,4 +96,20 @@ void EpollServer::run() {
             }
         }
     }
+}
+
+void EpollServer::stop() {
+    std::cout << "Server stopping..." << std::endl;
+    stop_ = true;
+
+    server_epoll_.close();
+    serving_thread_.join();
+    for (auto& epoll : epoll_events_) {
+        epoll.close();
+    }
+
+    for (int i = 0; i < workers_.size(); ++i) {
+        workers_[i].join();
+    }
+    std::cout << "Server stopped!" << std::endl;
 }

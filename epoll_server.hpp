@@ -11,6 +11,7 @@
 #include <functional>
 #include <thread>
 #include <vector>
+#include <atomic>
 
 #include "epoll_event.hpp"
 
@@ -19,22 +20,24 @@ public:
     EpollServer(int port);
     virtual ~EpollServer();
 
-    void init();
-    void worker(int worker_id);
-    void run();
+    void start();
+    void stop();
 
     virtual void handle_epollin(EpollEvent& epoll, int client_fd, std::string&& buffer) = 0;
     virtual void handle_epollout(EpollEvent& epoll, int client_fd, std::string&& buffer) = 0;
 
 private:
-    const int max_workers_;
-    static constexpr int MAX_BACKLOG_ = 10000;
+    void init();
+    void worker(int worker_id);
+    void serving();
 
+    const int max_workers_;
     int server_fd_;
     int port_;
 
-    bool stop_ = false; // TODO: use it to graceful shutdown
-    std::vector<std::thread> workers_;
+    std::atomic_bool stop_{false};
     std::vector<EpollEvent> epoll_events_;
     EpollEvent server_epoll_;
+    std::vector<std::thread> workers_;
+    std::thread serving_thread_;
 };

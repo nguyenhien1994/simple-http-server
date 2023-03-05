@@ -13,10 +13,6 @@ public:
         events_.resize(max_events_);
     }
 
-    ~EpollEvent() {
-        close(epoll_fd_);
-    }
-
     void add(int fd, uint32_t events) const {
         struct epoll_event event;
         event.data.fd = fd;
@@ -42,9 +38,13 @@ public:
     }
 
     std::vector<struct epoll_event> wait() {
-        int num_events = epoll_wait(epoll_fd_, events_.data(), max_events_, -1);
+        int num_events = epoll_wait(epoll_fd_, events_.data(), max_events_, 100);
         std::vector<struct epoll_event> result(events_.begin(), events_.begin() + num_events);
         return std::move(result);
+    }
+
+    void close() {
+        ::close(epoll_fd_);
     }
 
 private:
