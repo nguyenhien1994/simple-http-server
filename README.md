@@ -3,9 +3,11 @@
 Implementation of a simple HTTP server with C++
 
 ## Features
+- Run on Linux only
 - It can handle a huge concurrent connections (> 10k).
-- Support HTTP/1.1, persistent connections.
-- Support basic request and response. It's extensible via template parameters.
+- Only support HTTP/1.0 and HTTP/1.1, with basic request methods: GET, POST, PUT, DELETE.
+- Support basic HTTP/1.1, persistent connections. So it can serve > 100k request per second on modern personal computer.
+- Support basic request and response, request size < 4KB.
 - The art of speed is about epoll, refer 63.4.5 of [The Linux Programming Interface book](https://sciencesoftcode.files.wordpress.com/2018/12/the-linux-programming-interface-michael-kerrisk-1.pdf)
 
 ![image](https://user-images.githubusercontent.com/13882316/222970282-075dc738-0847-4eab-aff3-fdf179f9b329.png)
@@ -22,8 +24,6 @@ mkdir build
 cd build
 cmake .. && make
 ```
-
-## Insight of the 
 
 ## Usage
 
