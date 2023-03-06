@@ -4,30 +4,31 @@
 
 #include "epoll_server.hpp"
 
+namespace http_server {
+
 template <typename RequestType, typename ResponseType>
-class HttpServer : public EpollServer {
+class HttpServer : public server::EpollServer {
 public:
     using HandlerFunc = std::function<void(const RequestType&, ResponseType&)>;
 
-    HttpServer(int port) : EpollServer(port) {
+    HttpServer(int port) : server::EpollServer(port) {
     }
 
-    void register_handler(const std::string& path, const HandlerFunc handler) {
-        std::cout << "register_handler: " << path << std::endl;
-        handlers_[path] = handler;
+    void register_handler(const std::string& uri, const HandlerFunc handler) {
+        handlers_[uri] = handler;
     }
 
-    void handle_epollin(EpollEvent& epoll, int client_fd, std::string&& buffer) final {
+    void handle_epollin(server::EpollEvent& epoll, int client_fd, std::string&& buffer) final {
         try {
             RequestType req(std::move(buffer));
             ResponseType res;
 
-            auto it = handlers_.find(req.path_);
+            auto it = handlers_.find(req.get_uri());
             if (it != handlers_.end()) {
                 it->second(req, res);
             } else {
-                res.status_code_ = 404; // TODO: define enum for status code
-                res.body_ = "NOT FOUND";
+                res.set_status(http_message::HttpStatus::NotFound);
+                res.set_body("NOT FOUND");
             }
 
             // TODO: send response via epoll EPOLLOUT?
@@ -48,7 +49,8 @@ public:
                 response_len -= sent_bytes;
             }
 
-            if (req.version_ == "HTTP/1.0") {
+            // close connection with HTTP/1.0 version
+            if (req.get_version() == http_message::HttpVersion::HTTP_1_0) {
                 epoll.remove(client_fd);
                 ::close(client_fd);
             }
@@ -57,10 +59,11 @@ public:
         }
     }
 
-    void handle_epollout(EpollEvent& epoll, int client_fd, std::string&& buffer) final {
+    void handle_epollout(server::EpollEvent& epoll, int client_fd, std::string&& buffer) final {
     }
-
 
 private:
     std::map<std::string, HandlerFunc> handlers_;
 };
+
+} // namespace http_server

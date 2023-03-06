@@ -2,6 +2,8 @@
 
 #include "epoll_server.hpp"
 
+namespace server {
+
 EpollServer::EpollServer(int port) :
         port_(port),
         max_workers_(std::thread::hardware_concurrency()),
@@ -113,3 +115,5 @@ void EpollServer::stop() {
     }
     std::cout << "Server stopped!" << std::endl;
 }
+
+} // namespace server

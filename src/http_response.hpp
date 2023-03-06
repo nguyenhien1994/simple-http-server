@@ -1,40 +1,41 @@
-#pragma once
+#include "http_message.hpp"
 
-#include <string>
-#include <map>
+namespace http_message {
 
-struct Response {
-    Response(int status_code = 200) : status_code_(status_code) {}
-    int status_code_;
-    std::map<std::string, std::string> headers_;
-    std::string body_;
+class HttpResponse : public HttpMessage {
+private:
+    HttpStatus status_;
+    std::string reason_;
 
-    // TODO: define enum for status_code
-    std::string to_string(int status_code) const {
-        switch(status_code) {
-            case 200:
-            case 204:
-                return "OK";
-            case 404:
-                return "Not Found";
-            default:
-                return "";
-        }
+public:
+    HttpResponse(HttpStatus status = HttpStatus::OK) {}
+
+    HttpStatus get_status() const {
+        return this->status_;
+    }
+
+    void set_status(HttpStatus status) {
+        this->status_ = status;
+    }
+
+    std::string get_reason() const {
+        return this->reason_;
+    }
+
+    void set_reason(const std::string &reason) {
+        this->reason_ = reason;
     }
 
     std::string to_string() const {
         std::ostringstream oss;
-
-        oss << "HTTP/1.1 " << status_code_ << ' ' << to_string(status_code_) << "\r\n";
-        for (const auto& kv : headers_) {
-            oss << kv.first << ": " << kv.second << "\r\n";
-        }
-
+        oss << http_version_to_string(HttpVersion::HTTP_1_1) << ' ';
+        oss << static_cast<int>(status_) << ' ' << http_status_to_string(status_) << "\r\n";
+        oss << this->get_header_string();
         if (!body_.empty()) {
-            oss << "Content-Length: " << body_.size() << "\r\n\r\n";
-            oss << body_;
+            oss << "\r\n" << body_;
         }
-
         return oss.str();
     }
 };
+
+} // namespace http_message

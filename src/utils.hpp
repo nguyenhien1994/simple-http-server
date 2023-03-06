@@ -2,6 +2,7 @@
 
 #include <string>
 
+namespace utils {
 static const std::string white_space_chars = " \t\n\r\f\v";
 
 inline std::string ltrim(std::string s, const std::string& chars = white_space_chars) {
@@ -17,3 +18,5 @@ inline std::string rtrim(std::string s, const std::string& chars = white_space_c
 inline std::string trim(std::string s, const std::string& chars = white_space_chars) {
     return ltrim(rtrim(s, chars), chars);
 }
+
+} // namespace utils

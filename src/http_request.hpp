@@ -1,20 +1,41 @@
-#pragma once
-
-#include <algorithm>
-#include <sstream>
 #include <iostream>
-#include <string>
-#include <map>
 
+#include "http_message.hpp"
 #include "utils.hpp"
 
-struct Request {
-    Request(std::string&& raw_string) : raw_request_str_(std::move(raw_string)) {
+namespace http_message {
+
+class HttpRequest : public HttpMessage {
+private:
+    HttpMethod method_;
+    std::string uri_;
+    std::string body_;
+    std::string raw_request_str_;
+
+public:
+    HttpRequest(std::string&& raw_string) : raw_request_str_(std::move(raw_string)) {
         parse_request();
+    }
+
+    HttpMethod get_method() const {
+        return this->method_;
+    }
+
+    void set_method(HttpMethod method) {
+        this->method_ = method;
+    }
+
+    std::string get_uri() const {
+        return this->uri_;
+    }
+
+    void set_uri(const std::string &uri) {
+        this->uri_ = uri;
     }
 
     void parse_request() {
         size_t start = 0, end = 0;
+        std::string method_str, version_str;
 
         // parse the first line
         end = raw_request_str_.find("\r\n", start);
@@ -22,7 +43,10 @@ struct Request {
             throw std::invalid_argument("Invalid request string");
         }
         std::istringstream iss(raw_request_str_.substr(start, end - start));
-        iss >> method_ >> path_ >> version_;
+        iss >> method_str >> uri_ >> version_str;
+        method_ = string_to_http_method(method_str);
+        version_ = string_to_http_version(version_str);
+
         if (!iss.good() && !iss.eof()) {
             throw std::invalid_argument("Invalid request string");
         }
@@ -41,7 +65,7 @@ struct Request {
                 std::getline(ss, key, ':');
                 std::getline(ss, value);
 
-                headers_[trim(key)] = trim(value);
+                headers_[utils::trim(key)] = utils::trim(value);
             }
         }
 
@@ -51,23 +75,16 @@ struct Request {
         if (start < end) {
             body_ = raw_request_str_.substr(start, end - start);
         }
-
-        // print_debug();
     }
 
-    void print_debug() const {
-        std::cout << method_ << " " << path_ << " " << version_ << std::endl;
-        for (const auto& kv : headers_) {
-            std::cout << kv.first << ": " << kv.second << std::endl;
-        }
-        std::cout << body_ << std::endl;
+    std::string to_string() const {
+        std::ostringstream oss;
+        oss << http_method_to_string(method_) << " " << uri_ << " " << http_version_to_string(version_) << '\n';
+        oss << this->get_header_string() << '\n';
+        oss << body_ << std::endl;
+        return oss.str();
     }
 
-    std::string raw_request_str_;
-    std::string method_;
-    std::string path_;
-    std::string version_;
-    std::map<std::string, std::string> headers_;
-    std::string body_;
 };
 
+} // namespace http_message

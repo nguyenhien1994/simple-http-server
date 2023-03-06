@@ -2,6 +2,8 @@
 
 #include "epoll_event.hpp"
 
+namespace server {
+
 EpollEvent::EpollEvent() {
     epoll_fd_ = ::epoll_create1(0);
     if (epoll_fd_ == -1) {
@@ -43,3 +45,5 @@ std::vector<struct epoll_event> EpollEvent::wait() {
 void EpollEvent::close() const {
     ::close(epoll_fd_);
 }
+
+} // namespace server

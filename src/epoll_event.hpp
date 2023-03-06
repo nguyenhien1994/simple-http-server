@@ -5,6 +5,8 @@
 #include <vector>
 #include <cstring>
 
+namespace server {
+
 class EpollEvent {
 public:
     EpollEvent();
@@ -19,3 +21,5 @@ private:
     static constexpr int max_events_ = SOMAXCONN;
     std::vector<struct epoll_event> events_;
 };
+
+} // namespace server

@@ -11,6 +11,8 @@
 
 #include "epoll_event.hpp"
 
+namespace server {
+
 class EpollServer {
 public:
     EpollServer(int port);
@@ -37,3 +39,5 @@ private:
     std::vector<std::thread> workers_;
     std::thread serving_thread_;
 };
+
+} // namespace server
