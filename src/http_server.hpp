@@ -19,43 +19,37 @@ public:
     }
 
     void handle_epollin(server::EpollEvent& epoll, int client_fd, std::string&& buffer) final {
+        ResponseType response;
+        bool should_close = true;
         try {
-            RequestType req(std::move(buffer));
-            ResponseType res;
+            RequestType request(std::move(buffer));
 
-            auto it = handlers_.find(req.get_uri());
+            auto it = handlers_.find(request.get_uri());
             if (it != handlers_.end()) {
-                it->second(req, res);
+                it->second(request, response);
             } else {
-                res.set_status(http_message::HttpStatus::NotFound);
-                res.set_body("NOT FOUND");
+                response.set_status(http_message::HttpStatus::NotFound);
+                response.set_body("NOT FOUND");
             }
-
-            // TODO: send response via epoll EPOLLOUT?
-            auto response_buffer = res.to_string();
-            auto response_len = response_buffer.length();
-
-            while (response_len > 0) {
-                auto sent_bytes = send(client_fd, response_buffer.c_str(), response_buffer.length(), 0);
-                if (sent_bytes < 0) {
-                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        // retry
-                        continue;
-                    }
-                    epoll.remove(client_fd);
-                    ::close(client_fd);
-                    return;
-                }
-                response_len -= sent_bytes;
-            }
-
+            
             // close connection with HTTP/1.0 version
-            if (req.get_version() == http_message::HttpVersion::HTTP_1_0) {
-                epoll.remove(client_fd);
-                ::close(client_fd);
+            if (request.get_version() != http_message::HttpVersion::HTTP_1_0) {
+                should_close = false;
             }
-        } catch (const std::exception& e) {
-            std::cerr << e.what() << std::endl;
+
+        }  catch (const std::invalid_argument &e) {
+            response.set_status(http_message::HttpStatus::BadRequest);
+            response.set_body(e.what());
+        } catch (const std::exception &e) {
+            response.set_status(http_message::HttpStatus::InternalServerError);
+            response.set_body(e.what());
+        }
+
+        send_response(epoll, client_fd, response);
+
+        if (should_close) {
+            epoll.remove(client_fd);
+            ::close(client_fd);
         }
     }
 
@@ -63,6 +57,26 @@ public:
     }
 
 private:
+    // TODO: send response via epoll EPOLLOUT?
+    void send_response(server::EpollEvent& epoll, int client_fd, const ResponseType& response) {
+        auto response_str = response.to_string();
+        auto response_len = response_str.length();
+
+        while (response_len > 0) {
+            auto sent_bytes = send(client_fd, response_str.c_str(), response_str.length(), 0);
+            if (sent_bytes < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // retry
+                    continue;
+                }
+                epoll.remove(client_fd);
+                ::close(client_fd);
+                return;
+            }
+            response_len -= sent_bytes;
+        }
+    }
+
     std::map<std::string, HandlerFunc> handlers_;
 };
 

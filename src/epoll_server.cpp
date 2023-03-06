@@ -101,7 +101,7 @@ void EpollServer::serving() {
 }
 
 void EpollServer::stop() {
-    std::cout << "Server stopping..." << std::endl;
+    std::cout << "Stopping server..." << std::endl;
     stop_ = true;
 
     server_epoll_.close();
