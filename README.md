@@ -6,7 +6,7 @@ Implementation of a simple HTTP server with C++
 - Run on Linux only
 - It can handle a huge concurrent connections (> 10k).
 - Only support HTTP/1.0 and HTTP/1.1, with basic request methods: GET, POST, PUT, DELETE.
-- Support basic HTTP/1.1, persistent connections. So it can serve > 100k request per second on modern personal computer.
+- Only support basic HTTP/1.1, **persistent connections**, focus on serving as much RPS as possible.
 - Support basic request and response, request size < 4KB.
 - The art of speed is about epoll, refer 63.4.5 of [The Linux Programming Interface book](https://sciencesoftcode.files.wordpress.com/2018/12/the-linux-programming-interface-michael-kerrisk-1.pdf)
 
