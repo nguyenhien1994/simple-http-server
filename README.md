@@ -12,6 +12,9 @@ Implementation of a simple HTTP server with C++
 
 ![image](https://user-images.githubusercontent.com/13882316/222970282-075dc738-0847-4eab-aff3-fdf179f9b329.png)
 
+## Design
+TBU
+
 ## Clone and build the source code
 
 To install this server, follow these steps:
@@ -46,3 +49,10 @@ Benchmarking with [wrk](https://github.com/wg/wrk)
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request if you would like to contribute.
+
+## TODO:
+[] Add basic design
+[] Add unittests
+[] Support more features HTTP/1.1
+[] Support send a receive message with large payload
+[]...
