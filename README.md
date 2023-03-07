@@ -51,8 +51,8 @@ Benchmarking with [wrk](https://github.com/wg/wrk)
 Contributions are welcome! Please open an issue or submit a pull request if you would like to contribute.
 
 ## TODO:
-[] Add basic design
-[] Add unittests
-[] Support more features HTTP/1.1
-[] Support send a receive message with large payload
-[]...
+- [ ] Add basic design
+- [ ] Add unittests
+- [ ] Support more features HTTP/1.1
+- [ ] Support send a receive message with large payload
+- [ ]...
